@@ -27,7 +27,7 @@ if('POST' == $_SERVER['REQUEST_METHOD'])
         $authHeader = "Authorization: Bearer ". $accessToken;
 
         //Set the params.//
-        $fromLanguage = "en";
+        //$fromLanguage = "en";
         //$toLanguage   = "es";
         $toLanguage   = "hu";
         $inputStr     = $_POST["txtToTranslate"];

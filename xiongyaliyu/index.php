@@ -13,11 +13,11 @@ class wechatCallbackapiTest
 {
 	public function valid()
     {
-        $echoStr = $_GET["echostr"];
+        //$echoStr = $_GET["echostr"];
         
         //valid signature , option
         if($this->checkSignature()){
-            echo $echoStr;    //for check
+            //echo $echoStr;    //for check
             $this->responseMsg();
         	exit;
         }
@@ -52,21 +52,31 @@ class wechatCallbackapiTest
         }
     }
     
+
     //解析，处理，得到返回字符串
     private function receiveText($object){
         $keyword = trim($object->Content);
 		if(!empty( $keyword ))
         {
             if($keyword == "help")
-                $contentStr = "欢迎使用，输入\n[翻译text] 球哥会帮你中英翻译!\n[梦见text] 球哥帮你分析分析!\n[听歌 title #歌手 singer] 点歌,#歌手 singer可以不填,不过填了能帮助我更好地知道你要的是什么歌";
+                $contentStr = "欢迎使用匈牙利语，输入\n[翻译text] 帮你翻译成匈牙利语!\n高级用法输入[匈英 text] 从匈牙利语翻译为英语,目前支持中英匈";
             else{
-                if(substr($keyword,0,6) == "梦见"){
-                    $entityName = trim(substr($keyword,6,strlen($keyword)));
-                    return $this->getDream($object,$entityName);
-                }
                 if(substr($keyword,0,6) == "翻译"){
                     $entityName = trim(substr($keyword,6,strlen($keyword)));
                     return $this->getTranslate($object,$entityName);
+                }
+                else{
+                    $from = $this->getLanguageCode(substr($keyword,0,3));
+                    $to = $this->getLanguageCode(substr($keyword,3,3));
+                    $entityName = trim(substr($keyword,6,strlen($keyword)));
+                    if ( $from != "" && $to != "" ){
+                        return $this->getTranslate($object,$entityName,$from,$to);
+                    }
+                }
+                /*
+                if(substr($keyword,0,6) == "梦见"){
+                    $entityName = trim(substr($keyword,6,strlen($keyword)));
+                    return $this->getDream($object,$entityName);
                 }
                 if(substr($keyword,0,6) == "听歌"){
                     $singerPos = strpos($keyword,"#歌手");
@@ -79,9 +89,11 @@ class wechatCallbackapiTest
                     }
                     return $this->getSong($object,$song,$singer);
                 }
-                else{
+                */
+                
+                //else{
                     $contentStr = "输入格式有误，输入[help]获得帮助";
-                }
+                //}
             }
         }else{
             $contentStr = "Input something...";
@@ -106,80 +118,75 @@ class wechatCallbackapiTest
 
     }
 
-    //翻译 
-    private function getTranslate($object,$entityName){
-        
-    include 'HttpTranslator.php';
-    include 'AccessTokenAuthentication.php';
-
-    try {
-        //Client ID of the application.
-        //$clientID       = "fc9827b7-1512-44d3-93b4-5a088ad4d4b9";
-        $clientID   = "xiongyaliyu";
-        //Client Secret key of the application.
-        //$clientSecret = "f4xHZtBN7o9g6V5Uuyfy0mtAzpWDRjMTpXEkMjwu1Fg=";
-        $clientSecret = "MeD+7YJsG+e06K+ZJseOOpSb6NwbYY2nu5nRAboVdsw=";
-        //OAuth Url.
-        $authUrl      = "https://datamarket.accesscontrol.windows.net/v2/OAuth2-13/";
-        //Application Scope Url
-        $scopeUrl     = "http://api.microsofttranslator.com";
-        //Application grant type
-        $grantType    = "client_credentials";
-
-        //Create the AccessTokenAuthentication object.
-        $authObj      = new AccessTokenAuthentication();
-        //Get the Access token.
-        $accessToken  = $authObj->getTokens($grantType, $scopeUrl, $clientID, $clientSecret, $authUrl);
-        //Create the authorization Header string.
-        $authHeader = "Authorization: Bearer ". $accessToken;
-
-        //Set the params.//
-        $fromLanguage = "en";
-        //$toLanguage   = "es";
-        $toLanguage   = "hu";
-        //$inputStr     = $_POST["txtToTranslate"];
-        $inputStr = $entityName;
-        $contentType  = 'text/plain';
-        $category     = 'general';
-    
-        $params = "text=".urlencode($inputStr)."&to=".$toLanguage."&from=".$fromLanguage;
-        $translateUrl = "http://api.microsofttranslator.com/v2/Http.svc/Translate?$params";
-    
-        //Create the Translator Object.
-        $translatorObj = new HTTPTranslator();
-    
-        //Get the curlResponse.
-        $curlResponse = $translatorObj->curlRequest($translateUrl, $authHeader);
-    
-        //Interprets a string of XML into an object.
-        $xmlObj = simplexml_load_string($curlResponse);
-        foreach((array)$xmlObj[0] as $val){
-            $translatedStr = $val;
+    private function getLanguageCode($str){
+        switch ($str){
+            case "中":
+                return "zh-CHS";
+            case "英":
+                return "en";
+            case "匈":
+                return "hu";
+            default:
+                return "";
         }
-
-    } catch (Exception $e) {
-        echo "Exception: " . $e->getMessage() . PHP_EOL;
     }
-        
-    $resultStr = $this->transmitText($object,$translatedStr,0);
-    return $resultStr;
-        
-        /*
-        if ($entityName == ""){
-            $contentStr = "不说，我懒得帮你!";
-        }else{
-            $apihost = "http://api2.sinaapp.com/";
-            $apimethod = "search/translate/?";
-            $apiparams = array('appkey'=>"0020120430", 'appsecert'=>"fa6095e113cd28fd", 'reqtype'=>"text");
-            $apikeyword = "&keyword=".urlencode($entityName);
-            $apicallurl = $apihost.$apimethod.http_build_query($apiparams).$apikeyword;
-            $api2str = file_get_contents($apicallurl);
-            $api2json = json_decode($api2str, true);
-            $contentStr = $api2json['text']['content'];
+
+    //翻译 
+    private function getTranslate($object,$entityName,$fromLanguage="",$toLanguage="hu"){
+        if ($entityName === ""){
+            return $this->transmitText($object,"我不知道你要翻译什么？",0);
         }
-        $resultStr = $this->transmitText($object, $contentStr, 0);
+        include 'HttpTranslator.php';
+        include 'AccessTokenAuthentication.php';
+
+        try {
+            //Client ID of the application.
+            $clientID   = "xiongyaliyu";
+            //Client Secret key of the application.
+            $clientSecret = "MeD+7YJsG+e06K+ZJseOOpSb6NwbYY2nu5nRAboVdsw=";
+            //OAuth Url.
+            $authUrl      = "https://datamarket.accesscontrol.windows.net/v2/OAuth2-13/";
+            //Application Scope Url
+            $scopeUrl     = "http://api.microsofttranslator.com";
+            //Application grant type
+            $grantType    = "client_credentials";
+
+            //Create the AccessTokenAuthentication object.
+            $authObj      = new AccessTokenAuthentication();
+            //Get the Access token.
+            $accessToken  = $authObj->getTokens($grantType, $scopeUrl, $clientID, $clientSecret, $authUrl);
+            //Create the authorization Header string.
+            $authHeader = "Authorization: Bearer ". $accessToken;
+
+            //Set the params.//
+            //$fromLanguage = "en";
+            //$toLanguage   = "es";
+            //$toLanguage   = "hu";
+            $inputStr = $entityName;
+            $contentType  = 'text/plain';
+            $category     = 'general';
+    
+            $params = "text=".urlencode($inputStr)."&to=".$toLanguage."&from=".$fromLanguage;
+            $translateUrl = "http://api.microsofttranslator.com/v2/Http.svc/Translate?$params";
+            logger("tansURL:    ".$translateUrl); 
+            //Create the Translator Object.
+            $translatorObj = new HTTPTranslator();
+    
+            //Get the curlResponse.
+            $curlResponse = $translatorObj->curlRequest($translateUrl, $authHeader);
+    
+            //Interprets a string of XML into an object.
+            $xmlObj = simplexml_load_string($curlResponse);
+            foreach((array)$xmlObj[0] as $val){
+                $translatedStr = $val;
+            }
+
+        } catch (Exception $e) {
+            echo "Exception: " . $e->getMessage() . PHP_EOL;
+        }
+        
+        $resultStr = $this->transmitText($object,$translatedStr,0);
         return $resultStr;
-        */
     }
 
     private function getSong($object,$song,$singer){
