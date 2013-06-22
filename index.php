@@ -57,7 +57,7 @@ class wechatCallbackapiTest
 		if(!empty( $keyword ))
         {
             if($keyword == "help")
-                $contentStr = "欢迎使用，输入\n[翻译text] 球哥会帮你中英翻译!\n[梦见text] 球哥帮你分析分析!\n[听歌 title #歌手 singer] 点歌,#歌手 singer可以不填,不过填了能帮助我更好地知道你要的是什么歌";
+                $contentStr = "欢迎使用，输入\n[翻译text] 帮你中英翻译!\n[梦见text] 帮你分析分析!\n[听歌 title #歌手 singer] 点歌,#歌手 singer可以不填\n\n新功能\n查询周边:\n先发送位置给我(点对话框的+按钮，再点位置发送)，\n然后输入[找text]可以查询附近的服务信息";
             else{
                 if(substr($keyword,0,6) == "梦见"){
                     $entityName = trim(substr($keyword,6,strlen($keyword)));
@@ -78,6 +78,10 @@ class wechatCallbackapiTest
                     }
                     return $this->getSong($object,$song,$singer);
                 }
+                if(substr($keyword,0,3) == "找"){
+                    $entityName = trim(substr($keyword,3,strlen($keyword)));
+                    return $this->getNearBy($object,$entityName);
+                }
                 else{
                     $contentStr = "输入格式有误，输入[help]获得帮助";
                 }
@@ -95,10 +99,55 @@ class wechatCallbackapiTest
         $scale = $object->Scale;
         $label = $object->Label;
         logger("location:   x:".$x."    y:".$y."    scale:".$scale."    lable:".$label);
+        $this->saveLocation($object);  //save user location
+    }
+
+    private function saveLocation($locObj){
+        $username = $locObj->FromUserName; 
+        include 'userData.php';
+        
+        $loc = array('x'=>$locObj->Location_X, 'y'=>$locObj->Location_Y,'r'=>$locObj->Scale,'l'=>$locObj->Label);
+        $text = implode(",", $loc);  
+        logger("save locObj:".$text);
+        
+        UserData::getInstance()->$username = json_encode($loc);
+    }
+
+    private function getLocation($queryObject){
+        $username = $queryObject->FromUserName;
+        include 'userData.php';
+        return json_decode(UserData::getInstance()->$username,true);
+    }
+
+    private function getNearBy($queryObject,$entityName){
+        if ($entityName == "")
+            return $this->transmitText($queryObject, "你也不说要找什么", 0);
+        $locObj = $this->getLocation($queryObject);
+        if (!isset($locObj) || $locObj == "")
+            return $this->transmitText($queryObject, "亲，我还不知道你在哪", 0);
+        $apihost = "http://api.map.baidu.com/place/v2/";
+        $apimethod = "search?";
+        $apiparams = array('query'=>urlencode($entityName), 'location'=>"39.915,116.404",'radius'=>"2000", 'ak'=>"1339018708476b8ef2de89a1cff77ef0",'output'=>"xml");
+        $apiTpl = "http://api.map.baidu.com/place/v2/search?query=%s&location=%s,%s&radius=%s&ak=1339018708476b8ef2de89a1cff77ef0&output=json";
+        $apicallurl = sprintf($apiTpl, urlencode($entityName), $locObj['x'][0], $locObj['y'][0], $locObj['r'][0]*100);
+     
+#       logger("apiurl:".$apicallurl);
+        $api2str = file_get_contents($apicallurl);
+#        logger("apires:".$api2str);
+        $api2json = json_decode($api2str, true);
+        if($api2json['status'] != "0")
+            return $this->transmitText($queryObject, "查询失败了 T_T", 0);
+        $res=$api2json['results'];
+        if(count($res) == 0 )
+            return $this->transmitText($queryObject, "附近没有找到结果 T_T", 0);
+        return $this->transmitArticles($queryObject,$res,0);
     }
 
     private function receiveEvent($object){
-
+        logger("event".$object->Event); 
+        if($object->Event == "subscribe"){
+            return $this->transmitText($object, "哈哈，又多了位新朋友，欢迎关注球哥，输入help获得帮助",0);
+        }
     }
 
     private function receiveOther($object){
@@ -201,9 +250,37 @@ class wechatCallbackapiTest
 			return false;
 		}
 	}
+    
+    private function transmitArticles($object,$items, $funcFlag){
+        $itemsStr = "";
+        foreach($items as $item){
+            $itemStr = "<item>
+                <Title><![CDATA[".$item['name']."\n".$item['address']."]]></Title>
+                <Description></Description>
+                <PicUrl></PicUrl>
+                <Url></Url>
+                </item>";
+            $itemsStr = $itemsStr.$itemStr;
+        }
+        $articleTpl = "<xml>
+            <ToUserName><![CDATA[%s]]></ToUserName>
+            <FromUserName><![CDATA[%s]]></FromUserName>
+            <CreateTime>%s</CreateTime>
+            <MsgType><![CDATA[news]]></MsgType>
+            <Content><![CDATA[result]]></Content>
+            <ArticleCount><![CDATA[%s]]></ArticleCount>
+            <Articles>
+            %s
+            </Articles>
+            <FuncFlag><![CDATA[%s]]></FuncFlag>
+            </xml>";
+        $resultStr = sprintf($articleTpl, $object->FromUserName, $object->ToUserName, time(), count($items), $itemsStr, $funcFlag);
 
-    private function transmitText($object, $content, $funcFlag)
-    {
+        return $resultStr;
+
+    }
+
+    private function transmitText($object, $content, $funcFlag){
         $textTpl = "<xml>
             <ToUserName><![CDATA[%s]]></ToUserName>
             <FromUserName><![CDATA[%s]]></FromUserName>
@@ -213,11 +290,11 @@ class wechatCallbackapiTest
             <FuncFlag><![CDATA[%s]]></FuncFlag>
             </xml>";
         $resultStr = sprintf($textTpl, $object->FromUserName, $object->ToUserName, time(), $content, $funcFlag);
+        logger("resultStr:".$resultStr);
         return $resultStr;
     }
 
-    private function transmitMusic($object, $musicArray,$funcFlag)
-    {
+    private function transmitMusic($object, $musicArray,$funcFlag){
         $textTpl = "<xml>
             <ToUserName><![CDATA[%s]]></ToUserName>
             <FromUserName><![CDATA[%s]]></FromUserName>

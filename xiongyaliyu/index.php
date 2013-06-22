@@ -111,7 +111,10 @@ class wechatCallbackapiTest
     }
 
     private function receiveEvent($object){
-
+        logger("event".$object->Event); 
+        if($object->Event == "subscribe"){
+            return $this->transmitText($object, "非常感谢您关注此微信公共平台，此平台非官方账户，主要发布匈牙利的旅游，文化，美食信息，及提供简单的翻译服务！如果您喜欢的话，希望您能分享给好友！",0);
+        }
     }
 
     private function receiveOther($object){
