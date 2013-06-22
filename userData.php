@@ -24,3 +24,4 @@ class UserData {
         return $this->memcache->get($name);  
     }
 }
+>

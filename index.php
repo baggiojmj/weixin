@@ -57,7 +57,7 @@ class wechatCallbackapiTest
 		if(!empty( $keyword ))
         {
             if($keyword == "help")
-                $contentStr = "欢迎使用，输入\n[翻译text] 帮你中英翻译!\n[梦见text] 帮你分析分析!\n[听歌 title #歌手 singer] 点歌,#歌手 singer可以不填\n\n新功能\n查询周边:\n先发送位置给我(点对话框的+按钮，再点位置发送)，\n然后输入[找text]可以查询附近的服务信息";
+                $contentStr = "欢迎使用，输入\n[翻译text] 帮你中英翻译!\n[梦见text] 帮你分析分析!\n[听歌 title #歌手 singer] 点歌,#歌手 singer可以不填\n\n新功能\n查询周边:\n先发送位置给我(点对话框的+按钮，再点位置发送)；\n然后输入[找text]可以查询附近的服务信息(例如，找银行)。";
             else{
                 if(substr($keyword,0,6) == "梦见"){
                     $entityName = trim(substr($keyword,6,strlen($keyword)));
@@ -121,7 +121,7 @@ class wechatCallbackapiTest
 
     private function getNearBy($queryObject,$entityName){
         if ($entityName == "")
-            return $this->transmitText($queryObject, "你也不说要找什么", 0);
+            return $this->transmitText($queryObject, "你没说要找什么", 0);
         $locObj = $this->getLocation($queryObject);
         if (!isset($locObj) || $locObj == "")
             return $this->transmitText($queryObject, "亲，我还不知道你在哪", 0);
@@ -140,7 +140,8 @@ class wechatCallbackapiTest
         $res=$api2json['results'];
         if(count($res) == 0 )
             return $this->transmitText($queryObject, "附近没有找到结果 T_T", 0);
-        return $this->transmitArticles($queryObject,$res,0);
+        $itemStr = $this->transmitLocationItems($res);
+        return $this->transmitArticles($queryObject,count($res),$itemStr,0);
     }
 
     private function receiveEvent($object){
@@ -250,8 +251,8 @@ class wechatCallbackapiTest
 			return false;
 		}
 	}
-    
-    private function transmitArticles($object,$items, $funcFlag){
+   
+    private function transmitLocationItems($items){
         $itemsStr = "";
         foreach($items as $item){
             $itemStr = "<item>
@@ -262,6 +263,11 @@ class wechatCallbackapiTest
                 </item>";
             $itemsStr = $itemsStr.$itemStr;
         }
+        return $itemsStr; 
+    }
+        
+
+    private function transmitArticles($object, $count, $itemsStr, $funcFlag){
         $articleTpl = "<xml>
             <ToUserName><![CDATA[%s]]></ToUserName>
             <FromUserName><![CDATA[%s]]></FromUserName>
@@ -274,10 +280,8 @@ class wechatCallbackapiTest
             </Articles>
             <FuncFlag><![CDATA[%s]]></FuncFlag>
             </xml>";
-        $resultStr = sprintf($articleTpl, $object->FromUserName, $object->ToUserName, time(), count($items), $itemsStr, $funcFlag);
-
+        $resultStr = sprintf($articleTpl, $object->FromUserName, $object->ToUserName, time(), $count, $itemsStr, $funcFlag);
         return $resultStr;
-
     }
 
     private function transmitText($object, $content, $funcFlag){
