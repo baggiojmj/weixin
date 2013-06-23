@@ -17,6 +17,7 @@ class wechatCallbackapiTest
         
         //valid signature , option
         if($this->checkSignature()){
+            include 'Tools.php'; 
             $this->responseMsg();
         	exit;
         }
@@ -57,7 +58,7 @@ class wechatCallbackapiTest
 		if(!empty( $keyword ))
         {
             if($keyword == "help")
-                $contentStr = "欢迎使用，输入\n[翻译text] 帮你中英翻译!\n[梦见text] 帮你分析分析!\n[听歌 title #歌手 singer] 点歌,#歌手 singer可以不填\n\n新功能\n查询周边:\n先发送位置给我(点对话框的+按钮，再点位置发送)；\n然后输入[找text]可以查询附近的服务信息(例如，找银行)。";
+                $contentStr = "欢迎使用，输入\n[翻译text] 帮你中英翻译!\n[梦见text] 帮你分析分析!\n[听歌 title #歌手 singer] 点歌,#歌手 singer可以不填\n\n新功能\n6.22 查询周边:\n先发送位置给我(点对话框的+按钮，再点位置发送)；\n然后输入[找text]可以查询附近的服务信息(例如，找银行)。\n\n6.23 看新闻:\n输入[新闻text] 查找相关新闻(例如 新闻习大大)。";
             else{
                 if(substr($keyword,0,6) == "梦见"){
                     $entityName = trim(substr($keyword,6,strlen($keyword)));
@@ -152,7 +153,7 @@ class wechatCallbackapiTest
     private function receiveEvent($object){
         logger("event".$object->Event); 
         if($object->Event == "subscribe"){
-            return $this->transmitText($object, "哈哈，又多了位新朋友，欢迎关注球哥，输入help获得帮助",0);
+            return $this->transmitText($object, "哈哈，又多了位新朋友，欢迎关注球哥，输入[help]获得帮助",0);
         }
     }
 
@@ -160,24 +161,21 @@ class wechatCallbackapiTest
 
     }
 
-    //翻译 
+    //翻译
     private function getTranslate($object,$entityName){
         if ($entityName == ""){
             $contentStr = "不说，我懒得帮你!";
         }else{
-            $apihost = "http://api2.sinaapp.com/";
-            $apimethod = "search/translate/?";
-            $apiparams = array('appkey'=>"0020120430", 'appsecert'=>"fa6095e113cd28fd", 'reqtype'=>"text");
-            $apikeyword = "&keyword=".urlencode($entityName);
-            $apicallurl = $apihost.$apimethod.http_build_query($apiparams).$apikeyword;
-            $api2str = file_get_contents($apicallurl);
-            $api2json = json_decode($api2str, true);
-            $contentStr = $api2json['text']['content'];
+            include "xiongyaliyu/MicroSoftTranslateAPI.php";
+            if( hasChinese($entityName)){
+                $contentStr = getMSTranslate($entityName,"zh-CHS","en");
+            }else{
+                $contentStr = getMSTranslate($entityName,"en","zh-CHS");
+            }
         }
-        $resultStr = $this->transmitText($object, $contentStr, 0);
-        return $resultStr;
+        return $this->transmitText($object, $contentStr, 0);
     }
-    
+
     private function getNews($object,$entityName){
         if ($entityName == ""){
             return $this->transmitText($object,"请输入新闻关键字呀",0);
@@ -189,7 +187,6 @@ class wechatCallbackapiTest
             $newsStr = $this->transmitNewsItems($news);
             return $this->transmitArticles($object,count($news),$newsStr,0);
         }
-    
     }
 
     private function transmitNewsItems($news){
