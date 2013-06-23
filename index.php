@@ -67,6 +67,10 @@ class wechatCallbackapiTest
                     $entityName = trim(substr($keyword,6,strlen($keyword)));
                     return $this->getTranslate($object,$entityName);
                 }
+                if(substr($keyword,0,6) == "新闻"){
+                    $entityName = trim(substr($keyword,6,strlen($keyword)));
+                    return $this->getNews($object,$entityName);
+                }
                 if(substr($keyword,0,6) == "听歌"){
                     $singerPos = strpos($keyword,"#歌手");
                     if($singerPos != false){
@@ -82,6 +86,7 @@ class wechatCallbackapiTest
                     $entityName = trim(substr($keyword,3,strlen($keyword)));
                     return $this->getNearBy($object,$entityName);
                 }
+
                 else{
                     $contentStr = "输入格式有误，输入[help]获得帮助";
                 }
@@ -172,6 +177,35 @@ class wechatCallbackapiTest
         $resultStr = $this->transmitText($object, $contentStr, 0);
         return $resultStr;
     }
+    
+    private function getNews($object,$entityName){
+        if ($entityName == ""){
+            return $this->transmitText($object,"请输入新闻关键字呀",0);
+        }else{
+            include 'BaiduNewsAPI.php';
+            $news = getBaiduNews($entityName);
+            if( news == "" || count($news)==0)
+                return $this->transmitText($object,"没啥大事",0);
+            $newsStr = $this->transmitNewsItems($news);
+            return $this->transmitArticles($object,count($news),$newsStr,0);
+        }
+    
+    }
+
+    private function transmitNewsItems($news){
+        $newsStr = "";
+        foreach($news as $item){
+            $itemStr = "<item>
+                <Title><![CDATA[".$item['title']."\n".$item['source']."]]></Title>
+                <Description></Description>
+                <PicUrl></PicUrl>
+                <Url>".$item['url']."</Url>
+                </item>";
+            $newsStr = $newsStr.$itemStr;
+        }
+        return $newsStr; 
+    }
+        
 
     private function getSong($object,$song,$singer){
         $funcFlag = 0;
