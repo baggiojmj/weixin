@@ -184,7 +184,7 @@ class wechatCallbackapiTest
         }else{
             include 'BaiduNewsAPI.php';
             $news = getBaiduNews($entityName);
-            if( news == "" || count($news)==0)
+            if( $news == "" || count($news)==0)
                 return $this->transmitText($object,"没啥大事",0);
             $newsStr = $this->transmitNewsItems($news);
             return $this->transmitArticles($object,count($news),$newsStr,0);
