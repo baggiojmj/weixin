@@ -87,6 +87,10 @@ class wechatCallbackapiTest
                     $entityName = trim(substr($keyword,3,strlen($keyword)));
                     return $this->getNearBy($object,$entityName);
                 }
+                if(substr($keyword,0,3) == "买"){
+                    $entityName = trim(substr($keyword,3,strlen($keyword)));
+                    return $this->getShopItems($object,$entityName);
+                }
 
                 else{
                     $contentStr = "输入格式有误，输入[help]获得帮助";
@@ -136,7 +140,7 @@ class wechatCallbackapiTest
         $apiparams = array('query'=>urlencode($entityName), 'location'=>"39.915,116.404",'radius'=>"2000", 'ak'=>"1339018708476b8ef2de89a1cff77ef0",'output'=>"xml");
         $apiTpl = "http://api.map.baidu.com/place/v2/search?query=%s&location=%s,%s&radius=%s&ak=1339018708476b8ef2de89a1cff77ef0&output=json";
         $apicallurl = sprintf($apiTpl, urlencode($entityName), $locObj['x'][0], $locObj['y'][0], $locObj['r'][0]*100);
-     
+        
 #       logger("apiurl:".$apicallurl);
         $api2str = file_get_contents($apicallurl);
 #        logger("apires:".$api2str);
@@ -148,6 +152,15 @@ class wechatCallbackapiTest
             return $this->transmitText($queryObject, "附近没有找到结果 T_T", 0);
         $itemStr = $this->transmitLocationItems($res);
         return $this->transmitArticles($queryObject,count($res),$itemStr,0);
+    }
+
+    private function getShopItems($object,$entityName){
+        include 'TaobaoSearchAPI.php';
+        $items = getTaobaoItems($entityName);
+        if( $items == "" || count($items)==0)
+            return $this->transmitText($object,"没货",0);
+        $itemsStr = $this->transmitShopItems($items);
+        return $this->transmitArticles($object,count($items),$itemsStr,0);         
     }
 
     private function receiveEvent($object){
@@ -202,7 +215,20 @@ class wechatCallbackapiTest
         }
         return $newsStr; 
     }
-        
+
+    private function transmitShopItems($items){
+        $itemsStr = "";
+        foreach($items as $item){
+            $itemStr = "<item>
+                <Title><![CDATA[".$item['title']."]]></Title>
+                <Description></Description>
+                <PicUrl>".$item['picurl']."</PicUrl>
+                <Url>".$item['url']."</Url>
+                </item>";
+            $itemsStr = $itemsStr.$itemStr;
+        }
+        return $itemsStr; 
+    }
 
     private function getSong($object,$song,$singer){
         $funcFlag = 0;
