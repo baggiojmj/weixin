@@ -1,7 +1,4 @@
 <?php
-/**
-  * wechat php test
-  */
 
 //define your token
 define("TOKEN", "abao");
@@ -59,7 +56,7 @@ class wechatCallbackapiTest
 		if(!empty( $keyword ))
         {
             if($keyword == "help")
-                $contentStr = "欢迎使用";
+                $contentStr = "欢迎使用,输入 买XX 搜索店铺商品";
             else{
                 if(substr($keyword,0,3) == "买"){
                     $entityName = trim(substr($keyword,3,strlen($keyword)));
@@ -97,6 +94,13 @@ class wechatCallbackapiTest
             $itemsStr = $itemsStr.$itemStr;
         }
         return $itemsStr; 
+    }
+
+    private function receiveEvent($object){
+        logger("event".$object->Event); 
+        if($object->Event == "subscribe"){
+            return $this->transmitText($object, "您好，感谢您关注慕妍品牌专营店。尽享购物优惠资讯！爱慕妍，更贴心的享受！后续会有最新的精彩内容第一时间发送给您！",0);
+        }
     }
 
 	private function checkSignature()

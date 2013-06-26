@@ -1,7 +1,4 @@
 <?php
-/**
-  * wechat php test
-  */
 
 //define your token
 define("TOKEN", "jiangyingdan");
