@@ -99,7 +99,7 @@ class wechatCallbackapiTest
     private function receiveEvent($object){
         logger("event".$object->Event); 
         if($object->Event == "subscribe"){
-            return $this->transmitText($object, "您好，感谢您关注慕妍品牌专营店。尽享购物优惠资讯！爱慕妍，更贴心的享受！后续会有最新的精彩内容第一时间发送给您！",0);
+            return $this->transmitText($object, "亲，感谢您关注慕妍品牌专营店。尽享购物优惠资讯！爱慕妍，更贴心的享受！后续会有最新的精彩内容第一时间发送给您！输入[买+关键词]对您需要的宝贝进行搜索。如，输入[买慕妍睡衣]搜索慕妍品牌睡衣。更多功能开发中~",0);
         }
     }
 
