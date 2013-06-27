@@ -49,7 +49,7 @@ class wechatCallbackapiTest
         }
     }
     
-    //解析，处理，得到返回字符串
+    //文本消息处理
     private function receiveText($object){
         $keyword = trim($object->Content);
 		if(!empty( $keyword ))
@@ -84,7 +84,7 @@ class wechatCallbackapiTest
                     $entityName = trim(substr($keyword,3,strlen($keyword)));
                     return $this->getNearBy($object,$entityName);
                 }
-                if(substr($keyword,0,3) == "买"){
+                if(substr($keyword,0,3) == "淘"){
                     $entityName = trim(substr($keyword,3,strlen($keyword)));
                     return $this->getShopItems($object,$entityName);
                 }
@@ -100,6 +100,7 @@ class wechatCallbackapiTest
         return $resultStr;
     }
 
+    //位置消息处理
     private function receiveLocation($object){
         $x = $object->Location_X;
         $y = $object->Location_Y;
@@ -126,6 +127,7 @@ class wechatCallbackapiTest
         return json_decode(UserData::getInstance()->$username,true);
     }
 
+    //查询周边
     private function getNearBy($queryObject,$entityName){
         if ($entityName == "")
             return $this->transmitText($queryObject, "你没说要找什么", 0);
@@ -151,15 +153,17 @@ class wechatCallbackapiTest
         return $this->transmitArticles($queryObject,count($res),$itemStr,0);
     }
 
+    //查询店铺消息
     private function getShopItems($object,$entityName){
         include 'TaobaoSearchAPI.php';
-        $items = getTaobaoItems($entityName);
+        $items = getTaobaoItems($entityName,"lovemuyan");
         if( $items == "" || count($items)==0)
             return $this->transmitText($object,"没货",0);
         $itemsStr = $this->transmitShopItems($items);
         return $this->transmitArticles($object,count($items),$itemsStr,0);         
     }
 
+    //事件处理
     private function receiveEvent($object){
         logger("event".$object->Event); 
         if($object->Event == "subscribe"){
@@ -186,6 +190,7 @@ class wechatCallbackapiTest
         return $this->transmitText($object, $contentStr, 0);
     }
 
+    //查询新闻
     private function getNews($object,$entityName){
         if ($entityName == ""){
             return $this->transmitText($object,"请输入新闻关键字呀",0);
@@ -199,6 +204,7 @@ class wechatCallbackapiTest
         }
     }
 
+    //组织新闻items
     private function transmitNewsItems($news){
         $newsStr = "";
         foreach($news as $item){
@@ -213,6 +219,7 @@ class wechatCallbackapiTest
         return $newsStr; 
     }
 
+    //组织店铺items
     private function transmitShopItems($items){
         $itemsStr = "";
         foreach($items as $item){
@@ -226,7 +233,36 @@ class wechatCallbackapiTest
         }
         return $itemsStr; 
     }
+    
+    //组织附近信息items
+    private function transmitLocationItems($items){
+        $itemsStr = "";
+        foreach($items as $item){
+            $itemStr = "<item>
+                <Title><![CDATA[".$item['name']."\n".$item['address']."]]></Title>
+                <Description></Description>
+                <PicUrl></PicUrl>
+                <Url></Url>
+                </item>";
+            $itemsStr = $itemsStr.$itemStr;
+        }
+        return $itemsStr; 
+    }
+    private function transmitLocationItems($items){
+        $itemsStr = "";
+        foreach($items as $item){
+            $itemStr = "<item>
+                <Title><![CDATA[".$item['name']."\n".$item['address']."]]></Title>
+                <Description></Description>
+                <PicUrl></PicUrl>
+                <Url></Url>
+                </item>";
+            $itemsStr = $itemsStr.$itemStr;
+        }
+        return $itemsStr; 
+    }
 
+    //获得歌曲
     private function getSong($object,$song,$singer){
         $funcFlag = 0;
         if ($song == ""){
@@ -305,22 +341,8 @@ class wechatCallbackapiTest
 			return false;
 		}
 	}
-   
-    private function transmitLocationItems($items){
-        $itemsStr = "";
-        foreach($items as $item){
-            $itemStr = "<item>
-                <Title><![CDATA[".$item['name']."\n".$item['address']."]]></Title>
-                <Description></Description>
-                <PicUrl></PicUrl>
-                <Url></Url>
-                </item>";
-            $itemsStr = $itemsStr.$itemStr;
-        }
-        return $itemsStr; 
-    }
-        
 
+    //组织图文返回消息
     private function transmitArticles($object, $count, $itemsStr, $funcFlag){
         $articleTpl = "<xml>
             <ToUserName><![CDATA[%s]]></ToUserName>
@@ -338,6 +360,7 @@ class wechatCallbackapiTest
         return $resultStr;
     }
 
+    //组织文本返回消息
     private function transmitText($object, $content, $funcFlag){
         $textTpl = "<xml>
             <ToUserName><![CDATA[%s]]></ToUserName>
@@ -352,6 +375,7 @@ class wechatCallbackapiTest
         return $resultStr;
     }
 
+    //组织音频返回消息
     private function transmitMusic($object, $musicArray,$funcFlag){
         $textTpl = "<xml>
             <ToUserName><![CDATA[%s]]></ToUserName>

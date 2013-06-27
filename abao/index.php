@@ -75,7 +75,7 @@ class wechatCallbackapiTest
 
     private function getShopItems($object,$entityName){
         include '../TaobaoSearchAPI.php';
-        $items = getTaobaoItems($entityName);
+        $items = getTaobaoItems($entityName,"lovemuyan");
         if( $items == "" || count($items)==0)
             return $this->transmitText($object,"没货",0);
         $itemsStr = $this->transmitShopItems($items);
