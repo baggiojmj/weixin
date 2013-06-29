@@ -56,7 +56,7 @@ class wechatCallbackapiTest
 		if(!empty( $keyword ))
         {
             if($keyword == "help")
-                $contentStr = "欢迎使用匈牙利语，输入\n[翻译text] 帮你翻译成匈牙利语!\n高级用法输入[匈英 text] 从匈牙利语翻译为英语,目前支持中英匈";
+                $contentStr = "欢迎使用匈牙利语，输入[]括号中的内容:\n[翻译text] 帮你翻译成匈牙利语!\n高级用法输入[匈英 text] 从匈牙利语翻译为英语,目前支持中英匈";
             else{
                 if(substr($keyword,0,6) == "翻译"){
                     $entityName = trim(substr($keyword,6,strlen($keyword)));
@@ -89,7 +89,7 @@ class wechatCallbackapiTest
                 */
                 
                 //else{
-                    $contentStr = "输入格式有误，输入[help]获得帮助";
+                    $contentStr = "输入格式有误，输入 help 获得帮助";
                 //}
             }
         }else{
@@ -110,7 +110,7 @@ class wechatCallbackapiTest
     private function receiveEvent($object){
         logger("event".$object->Event); 
         if($object->Event == "subscribe"){
-            return $this->transmitText($object, "非常感谢您关注此微信公共平台，此平台非官方账户，主要发布匈牙利的旅游，文化，美食信息，及提供简单的翻译服务！如果您喜欢的话，希望您能分享给好友！",0);
+            return $this->transmitText($object, "非常感谢您关注此微信公共平台，此平台非官方账户，主要发布匈牙利的旅游，文化，美食信息，及提供简单的翻译服务(输入 help 获得帮助)！如果您喜欢的话，希望您能分享给好友！",0);
         }
     }
 

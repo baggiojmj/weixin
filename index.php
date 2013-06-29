@@ -39,6 +39,10 @@ class wechatCallbackapiTest
                      break;
                 case "location":
                     $resultStr = $this->receiveLocation($postObj);
+                    break;
+                case "image":
+                    $resultStr = $this->receiveImage($postObj);
+                    break;
                 default:
                     $resultStr = $this->receiveOther($postObj);                                                                                 
             }
@@ -64,6 +68,10 @@ class wechatCallbackapiTest
                 if(substr($keyword,0,6) == "翻译"){
                     $entityName = trim(substr($keyword,6,strlen($keyword)));
                     return $this->getTranslate($object,$entityName);
+                }
+                if(substr($keyword,0,6) == "菜谱"){
+                    $entityName = trim(substr($keyword,6,strlen($keyword)));
+                    return $this->getRecipes($object,$entityName);
                 }
                 if(substr($keyword,0,6) == "新闻"){
                     $entityName = trim(substr($keyword,6,strlen($keyword)));
@@ -140,9 +148,7 @@ class wechatCallbackapiTest
         $apiTpl = "http://api.map.baidu.com/place/v2/search?query=%s&location=%s,%s&radius=%s&ak=1339018708476b8ef2de89a1cff77ef0&output=json";
         $apicallurl = sprintf($apiTpl, urlencode($entityName), $locObj['x'][0], $locObj['y'][0], $locObj['r'][0]*100);
         
-#       logger("apiurl:".$apicallurl);
         $api2str = file_get_contents($apicallurl);
-#        logger("apires:".$api2str);
         $api2json = json_decode($api2str, true);
         if($api2json['status'] != "0")
             return $this->transmitText($queryObject, "查询失败了 T_T", 0);
@@ -171,6 +177,20 @@ class wechatCallbackapiTest
         }
     }
 
+    //图片处理
+    private function receiveImage($object){
+        logger("image:".$object->PicUrl);
+        $apihost = "http://api2.sinaapp.com/";
+        $apimethod = "recognize/picture/?";
+        $apiparams = array('appkey'=>"0020130430", 'appsecert'=>"fa6095e113cd28fd", 'reqtype'=>"text");
+        $apikeyword = "&keyword=".$object->PicUrl;
+        $apicallurl = $apihost.$apimethod.http_build_query($apiparams).$apikeyword;
+        $api2str = file_get_contents($apicallurl);
+        $api2json = json_decode($api2str, true);
+        $contentStr = $api2json['text']['content'];
+        return $this->transmitText($object,$contentStr,0);
+    }
+
     private function receiveOther($object){
 
     }
@@ -190,6 +210,20 @@ class wechatCallbackapiTest
         return $this->transmitText($object, $contentStr, 0);
     }
 
+    //菜谱
+    private function getRecipes($object,$entityName){
+        if ($entityName == ""){
+            $contentStr = "巧妇难为无米之炊";
+        }else{
+            include "MeishiSearchAPI.php";
+            $items = getRecipeItems($entityName);
+            if( $items == "" || count($items)==0)
+                return $this->transmitText($object,"这几个球哥也不会做",0);
+            $itemsStr = $this->transmitRecipeItems($items);
+            return $this->transmitArticles($object,count($items),$itemsStr,0);         
+        }
+        return $this->transmitText($object, $contentStr, 0);
+    }
     //查询新闻
     private function getNews($object,$entityName){
         if ($entityName == ""){
@@ -234,6 +268,21 @@ class wechatCallbackapiTest
         return $itemsStr; 
     }
     
+    //组织食谱items
+    private function transmitRecipeItems($items){
+        $itemsStr = "";
+        foreach($items as $item){
+            $itemStr = "<item>
+                <Title><![CDATA[".$item['title']."\n".$item['detail']."]]></Title>
+                <Description></Description>
+                <PicUrl>".$item['picurl']."</PicUrl>
+                <Url>".$item['url']."</Url>
+                </item>";
+            $itemsStr = $itemsStr.$itemStr;
+        }
+        return $itemsStr; 
+    }
+    
     //组织附近信息items
     private function transmitLocationItems($items){
         $itemsStr = "";
@@ -248,20 +297,7 @@ class wechatCallbackapiTest
         }
         return $itemsStr; 
     }
-    private function transmitLocationItems($items){
-        $itemsStr = "";
-        foreach($items as $item){
-            $itemStr = "<item>
-                <Title><![CDATA[".$item['name']."\n".$item['address']."]]></Title>
-                <Description></Description>
-                <PicUrl></PicUrl>
-                <Url></Url>
-                </item>";
-            $itemsStr = $itemsStr.$itemStr;
-        }
-        return $itemsStr; 
-    }
-
+    
     //获得歌曲
     private function getSong($object,$song,$singer){
         $funcFlag = 0;
@@ -272,7 +308,7 @@ class wechatCallbackapiTest
             logger("song:".$song);
             logger("singer".$singer);
             $reqUrl = "http://box.zhangmen.baidu.com/x?op=12&count=1&title=".urlencode($song)."$$".urlencode($singer)."$$$$";
-            logger("requrl:".$requrl);
+            logger("requrl:".$reqUrl);
             $api2str = file_get_contents($reqUrl);
             $apiobj = simplexml_load_string($api2str);
             logger("song count:".$apiobj->count);
