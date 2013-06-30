@@ -36,7 +36,7 @@ class wechatCallbackapiTest
                     break;
                 case "event":
                     $resultStr = $this->receiveEvent($postObj);
-                     break;
+                    break;
                 case "location":
                     $resultStr = $this->receiveLocation($postObj);
                     break;
@@ -59,7 +59,7 @@ class wechatCallbackapiTest
 		if(!empty( $keyword ))
         {
             if($keyword == "help")
-                $contentStr = "欢迎使用，输入\n[翻译text] 帮你中英翻译!\n[梦见text] 帮你分析分析!\n[听歌 title #歌手 singer] 点歌,#歌手 singer可以不填\n\n新功能\n6.22 查询周边:\n先发送位置给我(点对话框的+按钮，再点位置发送)；\n然后输入[找text]可以查询附近的服务信息(例如，找银行)。\n\n6.23 看新闻:\n输入[新闻text] 查找相关新闻(例如 新闻习大大)。";
+                $contentStr = "欢迎使用，输入\n[翻译text] 帮你中英翻译!\n[梦见text] 帮你分析分析!\n[听歌 title #歌手 singer] 点歌,#歌手 singer可以不填\n\n新功能\n6.22 查询周边:\n先发送位置(点对话框的+按钮，再点位置,发送);\n然后输入[找text]可查附近服务信息(例如，找银行)。\n\n6.23 看新闻:\n输入[新闻text] 查相关新闻(例如 新闻习大大)。\n\n6.29 菜谱:\n输入[菜谱 text] 查找食材能做些什么(例如 菜谱 黄瓜 冷面)\n\n6.30 名人脸:\n发送正脸自拍照，等待后，输入 要脸 返回相似名人脸。";
             else{
                 if(substr($keyword,0,6) == "梦见"){
                     $entityName = trim(substr($keyword,6,strlen($keyword)));
@@ -96,6 +96,9 @@ class wechatCallbackapiTest
                     $entityName = trim(substr($keyword,3,strlen($keyword)));
                     return $this->getShopItems($object,$entityName);
                 }
+                if($keyword == "要脸"){
+                    return $this->getFaceSimItems($object);
+                }
 
                 else{
                     $contentStr = "输入格式有误，输入[help]获得帮助";
@@ -119,21 +122,21 @@ class wechatCallbackapiTest
     }
 
     private function saveLocation($locObj){
-        $username = $locObj->FromUserName; 
         include 'userData.php';
-        
+        $key = $this->getLocKey($locObj);    
         $loc = array('x'=>$locObj->Location_X, 'y'=>$locObj->Location_Y,'r'=>$locObj->Scale,'l'=>$locObj->Label);
         $text = implode(",", $loc);  
         logger("save locObj:".$text);
         
-        UserData::getInstance()->$username = json_encode($loc);
+        UserData::getInstance()->$key = json_encode($loc);
     }
 
     private function getLocation($queryObject){
-        $username = $queryObject->FromUserName;
+        $key = $this->getLocKey($queryObject);
         include 'userData.php';
-        return json_decode(UserData::getInstance()->$username,true);
+        return json_decode(UserData::getInstance()->$key,true);
     }
+
 
     //查询周边
     private function getNearBy($queryObject,$entityName){
@@ -179,18 +182,26 @@ class wechatCallbackapiTest
 
     //图片处理
     private function receiveImage($object){
-        logger("image:".$object->PicUrl);
-        $apihost = "http://api2.sinaapp.com/";
-        $apimethod = "recognize/picture/?";
-        $apiparams = array('appkey'=>"0020130430", 'appsecert'=>"fa6095e113cd28fd", 'reqtype'=>"text");
-        $apikeyword = "&keyword=".$object->PicUrl;
-        $apicallurl = $apihost.$apimethod.http_build_query($apiparams).$apikeyword;
-        $api2str = file_get_contents($apicallurl);
-        $api2json = json_decode($api2str, true);
-        $contentStr = $api2json['text']['content'];
-        return $this->transmitText($object,$contentStr,0);
+        $key = $this->getFaceKey($object);
+        logger("key: ".$key." image: ".$object->PicUrl);
+        $cmd = "php FaceSim.php ".$key." ".$object->PicUrl;
+        logger("cmd: ".$cmd);
+        system("{$cmd} > /dev/null &");
+        return $this->transmitText($object,"图片处理耗时较长，请等待大约30秒后，输入 要脸 查看结果",0);
+    }
+    
+    //获得相似脸
+    private function getFaceSimItems($object){
+        $key = $this->getFaceKey($object);
+        include 'FaceSim.php';
+        $items = getFaceSim($key);
+        if (!isset($items) || $items == "" || count($items) == 0)
+            return $this->transmitText($object,"没有找到相似的明星脸",0);
+        $itemsStr = $this->transmitFaceSimItems($items);
+        return $this->transmitArticles($object,count($items),$itemsStr,0);         
     }
 
+    //TODO
     private function receiveOther($object){
 
     }
@@ -224,6 +235,7 @@ class wechatCallbackapiTest
         }
         return $this->transmitText($object, $contentStr, 0);
     }
+
     //查询新闻
     private function getNews($object,$entityName){
         if ($entityName == ""){
@@ -277,6 +289,21 @@ class wechatCallbackapiTest
                 <Description></Description>
                 <PicUrl>".$item['picurl']."</PicUrl>
                 <Url>".$item['url']."</Url>
+                </item>";
+            $itemsStr = $itemsStr.$itemStr;
+        }
+        return $itemsStr; 
+    }
+    
+    //组织食谱items
+    private function transmitFaceSimItems($items){
+        $itemsStr = "";
+        foreach($items as $item){
+            $itemStr = "<item>
+                <Title><![CDATA[".$item['name']."\n相似度 ".$item['sim']."]]></Title>
+                <Description></Description>
+                <PicUrl>".$item['picurl']."</PicUrl>
+                <Url>".$item['picurl']."</Url>
                 </item>";
             $itemsStr = $itemsStr.$itemStr;
         }
@@ -429,8 +456,15 @@ class wechatCallbackapiTest
         $resultStr = sprintf($textTpl, $object->FromUserName, $object->ToUserName, time(), $musicArray['title'], $musicArray['description'], $musicArray['MusicUrl'], $musicArray['HQMusicUrl'],$funcFlag);
         return $resultStr;
     }
-}
 
+    private function getLocKey($obj){
+        return $obj->FromUserName."_loc"; 
+    }
+
+    private function getFaceKey($obj){
+        return $obj->FromUserName."_face"; 
+    }
+}
 function traceHttp()
 {
     logger("REMOTE_ADDR:".$_SERVER["REMOTE_ADDR"].((strpos($_SERVER["REMOTE_ADDR"],"101.226"))===0?" From WeiXin":" Unknown IP"));
